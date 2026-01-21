@@ -1,11 +1,12 @@
 'use client'
 
 import React from 'react'
-import { Professor, PipelineStatus } from '@/lib/database.types'
-import { Building2, AlertTriangle, User, CheckCircle } from 'lucide-react'
+import { Professor, PipelineStatus, ActivityLog } from '@/lib/database.types'
+import { Building2, AlertTriangle, User, CheckCircle, Calendar } from 'lucide-react'
 
 interface ProfessorCardProps {
   professor: Professor
+  activityLogs: ActivityLog[]
   isStale: boolean
   onClick: () => void
 }
@@ -17,7 +18,7 @@ const STATUS_COLORS: Record<PipelineStatus, string> = {
   'First Client': 'bg-emerald-100 text-emerald-700',
 }
 
-export default function ProfessorCard({ professor, isStale, onClick }: ProfessorCardProps) {
+export default function ProfessorCard({ professor, activityLogs, isStale, onClick }: ProfessorCardProps) {
   return (
     <button
       onClick={onClick}
@@ -72,11 +73,25 @@ export default function ProfessorCard({ professor, isStale, onClick }: Professor
         </div>
       )}
 
-      {professor.next_action && (
+      {activityLogs.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-100">
-          <p className="text-xs text-slate-500 line-clamp-2">
-            <span className="font-medium">Next:</span> {professor.next_action}
-          </p>
+          <div className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Activity Log
+          </div>
+          <div className="space-y-1.5 max-h-24 overflow-y-auto">
+            {activityLogs.slice(0, 3).map((log) => (
+              <div key={log.id} className="text-xs text-slate-600">
+                <span className="text-slate-400">
+                  {new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}:
+                </span>{' '}
+                <span className="line-clamp-1">{log.entry}</span>
+              </div>
+            ))}
+            {activityLogs.length > 3 && (
+              <div className="text-xs text-slate-400">+{activityLogs.length - 3} more</div>
+            )}
+          </div>
         </div>
       )}
     </button>

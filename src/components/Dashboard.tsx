@@ -353,6 +353,7 @@ export default function Dashboard() {
               <ProfessorCard
                 key={professor.id}
                 professor={professor}
+                activityLogs={activityLogs[professor.id] || []}
                 isStale={isStale(professor)}
                 onClick={() => setSelectedProfessor(professor)}
               />
