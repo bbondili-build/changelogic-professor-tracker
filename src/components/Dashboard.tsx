@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Professor, PipelineStatus, ActivityLog } from '@/lib/database.types'
+import { Professor, PipelineStatus, ActivityLog, ChangeLog } from '@/lib/database.types'
 import ProfessorCard from './ProfessorCard'
 import ProfessorModal from './ProfessorModal'
 import AddProfessorModal from './AddProfessorModal'
@@ -33,6 +33,7 @@ export default function Dashboard() {
   const { isAdminMode, toggleAdminMode, logout } = useAuth()
   const [professors, setProfessors] = useState<Professor[]>([])
   const [activityLogs, setActivityLogs] = useState<Record<string, ActivityLog[]>>({})
+  const [changeLogs, setChangeLogs] = useState<Record<string, ChangeLog[]>>({})
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all')
@@ -67,6 +68,23 @@ export default function Dashboard() {
         logsByProfessor[log.professor_id].push(log)
       })
       setActivityLogs(logsByProfessor)
+
+      // Fetch change logs
+      const { data: changeLogsData, error: changeLogsError } = await supabase
+        .from('change_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (changeLogsError) console.error('Error fetching change logs:', changeLogsError)
+
+      const changeLogsByProfessor: Record<string, ChangeLog[]> = {}
+      changeLogsData?.forEach((log) => {
+        if (!changeLogsByProfessor[log.professor_id]) {
+          changeLogsByProfessor[log.professor_id] = []
+        }
+        changeLogsByProfessor[log.professor_id].push(log)
+      })
+      setChangeLogs(changeLogsByProfessor)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -136,6 +154,13 @@ export default function Dashboard() {
     setActivityLogs((prev) => ({
       ...prev,
       [professorId]: [log, ...(prev[professorId] || [])],
+    }))
+  }
+
+  const handleChangeLogsAdd = (professorId: string, logs: ChangeLog[]) => {
+    setChangeLogs((prev) => ({
+      ...prev,
+      [professorId]: [...logs, ...(prev[professorId] || [])],
     }))
   }
 
@@ -341,9 +366,11 @@ export default function Dashboard() {
         <ProfessorModal
           professor={selectedProfessor}
           activityLogs={activityLogs[selectedProfessor.id] || []}
+          changeLogs={changeLogs[selectedProfessor.id] || []}
           onClose={() => setSelectedProfessor(null)}
           onUpdate={handleProfessorUpdate}
           onActivityLogAdd={(log) => handleActivityLogAdd(selectedProfessor.id, log)}
+          onChangeLogsAdd={(logs) => handleChangeLogsAdd(selectedProfessor.id, logs)}
           isStale={isStale(selectedProfessor)}
         />
       )}

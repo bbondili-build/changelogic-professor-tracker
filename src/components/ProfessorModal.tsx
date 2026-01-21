@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Professor, ActivityLog, PipelineStatus, EngagementType, Liaison } from '@/lib/database.types'
+import { Professor, ActivityLog, ChangeLog, PipelineStatus, EngagementType, Liaison } from '@/lib/database.types'
 import {
   X,
   Building2,
@@ -19,21 +19,24 @@ import {
   MessageSquare,
   Link as LinkIcon,
   CheckCircle,
-  Trash2
+  History,
+  Clock
 } from 'lucide-react'
 
 interface ProfessorModalProps {
   professor: Professor
   activityLogs: ActivityLog[]
+  changeLogs: ChangeLog[]
   onClose: () => void
   onUpdate: (professor: Professor) => void
   onActivityLogAdd: (log: ActivityLog) => void
+  onChangeLogsAdd: (logs: ChangeLog[]) => void
   isStale: boolean
 }
 
 const STATUS_OPTIONS: PipelineStatus[] = ['Identified', 'In Contact', 'First Lead', 'First Client']
 const ENGAGEMENT_OPTIONS: EngagementType[] = ['Unknown', 'Hands Off', 'Open to Workshops', 'Open to Work', 'Open to be Staffed']
-const LIAISON_OPTIONS: Liaison[] = ['', 'MKB', 'Vincent', 'Andy', 'Sara', 'Melanie', 'Emily', 'Lorenzo', 'Vanessa', 'Martin']
+const LIAISON_OPTIONS: Liaison[] = ['', 'BB', 'Vincent', 'Andy', 'Sara', 'Melanie', 'Emily', 'Lorenzo', 'Vanessa', 'Martin']
 
 const STATUS_COLORS: Record<PipelineStatus, string> = {
   'Identified': 'bg-slate-100 text-slate-700 border-slate-300',
@@ -45,15 +48,17 @@ const STATUS_COLORS: Record<PipelineStatus, string> = {
 export default function ProfessorModal({
   professor,
   activityLogs,
+  changeLogs,
   onClose,
   onUpdate,
   onActivityLogAdd,
+  onChangeLogsAdd,
   isStale,
 }: ProfessorModalProps) {
   const { isAdminMode } = useAuth()
   const [formData, setFormData] = useState<Professor>(professor)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'history'>('details')
   const [newLogEntry, setNewLogEntry] = useState('')
   const [newLogDate, setNewLogDate] = useState(new Date().toISOString().split('T')[0])
   const [addingLog, setAddingLog] = useState(false)
@@ -70,6 +75,39 @@ export default function ProfessorModal({
   const handleSave = async () => {
     setSaving(true)
     try {
+      // Detect changes for change log
+      const changes: { field: string; oldVal: string; newVal: string }[] = []
+
+      const fieldsToTrack: { key: keyof Professor; label: string }[] = [
+        { key: 'name', label: 'Name' },
+        { key: 'institution', label: 'Institution' },
+        { key: 'status', label: 'Status' },
+        { key: 'liaison', label: 'Liaison' },
+        { key: 'engagement_type', label: 'Engagement Type' },
+        { key: 'contract_signed', label: 'Contract Signed' },
+        { key: 'next_action', label: 'Next Action' },
+        { key: 'notes', label: 'Notes' },
+      ]
+
+      fieldsToTrack.forEach(({ key, label }) => {
+        const oldVal = String(professor[key] || '')
+        const newVal = String(formData[key] || '')
+        if (oldVal !== newVal) {
+          changes.push({ field: label, oldVal, newVal })
+        }
+      })
+
+      // Track array changes
+      if (JSON.stringify(professor.core_ip) !== JSON.stringify(formData.core_ip)) {
+        changes.push({ field: 'Core IP', oldVal: professor.core_ip.join(', '), newVal: formData.core_ip.join(', ') })
+      }
+      if (JSON.stringify(professor.exec_ed_programs) !== JSON.stringify(formData.exec_ed_programs)) {
+        changes.push({ field: 'Exec Ed Programs', oldVal: professor.exec_ed_programs.join(', '), newVal: formData.exec_ed_programs.join(', ') })
+      }
+      if (JSON.stringify(professor.clients) !== JSON.stringify(formData.clients)) {
+        changes.push({ field: 'Clients', oldVal: professor.clients.join(', '), newVal: formData.clients.join(', ') })
+      }
+
       const { data, error } = await supabase
         .from('professors')
         .update({
@@ -93,6 +131,26 @@ export default function ProfessorModal({
         .single()
 
       if (error) throw error
+
+      // Log changes if any
+      if (changes.length > 0) {
+        const changeLogEntries = changes.map(c => ({
+          professor_id: professor.id,
+          field_name: c.field,
+          old_value: c.oldVal,
+          new_value: c.newVal,
+          changed_by: formData.liaison || 'Team',
+        }))
+
+        const { data: logData, error: logError } = await supabase
+          .from('change_logs')
+          .insert(changeLogEntries)
+          .select()
+
+        if (logError) console.error('Error logging changes:', logError)
+        if (logData) onChangeLogsAdd(logData)
+      }
+
       if (data) onUpdate(data)
     } catch (error) {
       console.error('Error saving professor:', error)
@@ -237,6 +295,16 @@ export default function ProfessorModal({
               }`}
             >
               Activity Log ({activityLogs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'history'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Change History ({changeLogs.length})
             </button>
           </div>
 
@@ -542,7 +610,7 @@ export default function ProfessorModal({
                   )}
                 </div>
               </div>
-            ) : (
+            ) : activeTab === 'activity' ? (
               /* Activity Log Tab */
               <div className="space-y-4">
                 {/* Add new log entry */}
@@ -604,7 +672,44 @@ export default function ProfessorModal({
                   </div>
                 )}
               </div>
-            )}
+            ) : activeTab === 'history' ? (
+              /* Change History Tab */
+              <div className="space-y-4">
+                {changeLogs.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No changes recorded yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {changeLogs.map((log) => (
+                      <div key={log.id} className="bg-white border border-slate-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{new Date(log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          {log.changed_by && (
+                            <>
+                              <span className="text-slate-300">•</span>
+                              <span>{log.changed_by}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium text-slate-700 mb-1">{log.field_name}</p>
+                        <div className="flex items-start gap-2 text-sm">
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded line-through">
+                            {log.old_value || '(empty)'}
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                            {log.new_value || '(empty)'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Footer */}

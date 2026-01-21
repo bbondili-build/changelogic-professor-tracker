@@ -9,7 +9,7 @@ export type EngagementType =
 
 export type Liaison =
   | ''
-  | 'MKB'
+  | 'BB'
   | 'Vincent'
   | 'Andy'
   | 'Sara'
@@ -52,6 +52,16 @@ export interface ActivityLog {
   date: string
   entry: string
   created_by: string
+  created_at: string
+}
+
+export interface ChangeLog {
+  id: string
+  professor_id: string
+  field_name: string
+  old_value: string
+  new_value: string
+  changed_by: string
   created_at: string
 }
 
@@ -106,6 +116,23 @@ export interface Database {
           date?: string
           entry?: string
           created_by?: string
+        }
+      }
+      change_logs: {
+        Row: ChangeLog
+        Insert: {
+          professor_id: string
+          field_name: string
+          old_value: string
+          new_value: string
+          changed_by?: string
+        }
+        Update: {
+          professor_id?: string
+          field_name?: string
+          old_value?: string
+          new_value?: string
+          changed_by?: string
         }
       }
     }

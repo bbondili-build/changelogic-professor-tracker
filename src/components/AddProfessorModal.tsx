@@ -12,7 +12,7 @@ interface AddProfessorModalProps {
 
 const STATUS_OPTIONS: PipelineStatus[] = ['Identified', 'In Contact', 'First Lead', 'First Client']
 const ENGAGEMENT_OPTIONS: EngagementType[] = ['Unknown', 'Hands Off', 'Open to Workshops', 'Open to Work', 'Open to be Staffed']
-const LIAISON_OPTIONS: Liaison[] = ['', 'MKB', 'Vincent', 'Andy', 'Sara', 'Melanie', 'Emily', 'Lorenzo', 'Vanessa', 'Martin']
+const LIAISON_OPTIONS: Liaison[] = ['', 'BB', 'Vincent', 'Andy', 'Sara', 'Melanie', 'Emily', 'Lorenzo', 'Vanessa', 'Martin']
 
 export default function AddProfessorModal({ onClose, onAdd }: AddProfessorModalProps) {
   const [saving, setSaving] = useState(false)
